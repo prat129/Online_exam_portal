@@ -1,0 +1,176 @@
+directive @cacheControl(
+    maxAge: Int
+    scope: CacheControlScope
+) on OBJECT | FIELD | FIELD_DEFINITION
+
+enum CacheControlScope {
+    PUBLIC
+    PRIVATE
+}
+directive @permission(
+  requires: Permission = MANAGE_APPLICATION,
+) on OBJECT | FIELD_DEFINITION
+
+directive @user_type(
+  requires: UserType = FACULTY,
+) on OBJECT | FIELD_DEFINITION
+enum UserType {
+    FACULTY
+    STUDENT
+}
+enum Permission {
+  MANAGE_APPLICATION
+  MANAGE_STUDENTS
+  MANAGE_FACULTY
+}
+
+scalar Date
+scalar DateTime
+scalar JSON
+interface User{
+    id: ID!
+    name: String!
+    username: String!
+    email: String
+    groups: [Group!]
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+type Student implements User {
+    id: ID!
+    name: String!
+    username: String!
+    usn: String!
+    groups: [Group!]
+    attempts:[Attempt!]
+    email: String
+    dob: Date
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+
+type Faculty implements User {
+    id: ID!
+    name: String!
+    username: String!
+    designation: String!
+    permissions: [String!]
+    tests: [Test!]
+    email: String
+    groups: [Group!]
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+
+type Course{
+    id: ID!
+    code: String!
+    name: String!
+    tests: [Test!]
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+
+type Test{
+    id: ID!
+    course: Course!
+    name: String!
+    settings: JSON!
+    faculties: [Faculty!]
+    groups: [Group!]
+    questions: [Question!]
+    attempts: [Attempt!]
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+type Group{
+    id: ID!
+    name: String!
+    students: [Student!]
+    faculties: [Faculty!]
+    tests: [Test!]
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+type QuestionSchema{
+    description:String!
+    options:[String!]
+    type:String
+    marks:Float!
+    correct_option: String @user_type(requires:FACULTY)
+}
+type Question{
+    id: ID!
+    qno: Int!
+    student_answers: [Answer!]
+    schema: QuestionSchema!
+    test: Test!
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+type Answer{
+    id: ID!
+    question: Question!
+    attempt: Attempt!
+    data: String!
+    created_at: DateTime!
+    updated_at: DateTime!
+    marks: Float
+}
+
+type Attempt{
+    id: ID!
+    student: Student!
+    test: Test!
+    answers: [Answer!]
+    marks: Float
+    created_at: DateTime!
+    submitted_at: DateTime
+    updated_at: DateTime!
+}
+
+type Query {
+    testCount: Int!
+    facultyCount: Int!
+    studentCount: Int!
+    me: User
+    student(id:ID!): Student
+    faculty(id:ID!): Faculty
+    students(limit:Int page:Int name:String): [Student!]
+    faculties(limit:Int page:Int name:String): [Faculty!]
+    tests(limit:Int page:Int name:String): [Test!]
+    groups(limit:Int page:Int name:String): [Group!]
+    courses(limit:Int page:Int name:String): [Course!]
+    question(id:ID!): Question
+    test(id:ID!): Test
+    answer(id:ID!): Answer
+    attempt(id:ID!): Attempt
+    course(id:ID!): Course
+    group(id:ID!): Group
+}
+type Mutation {
+    createFaculty(name: String! username: String! designation: String! email: String password: String! ): Faculty! @permission(requires:MANAGE_FACULTY) @user_type(requires:FACULTY)
+    createStudent(name: String! username: String! usn: String! email: String password: String! dob:Date): Student! @permission(requires:MANAGE_STUDENTS) @user_type(requires:FACULTY)
+    updateFaculty(id:ID! name: String username: String designation: String email: String): Faculty! @user_type(requires:FACULTY)
+    updateFacultyPermissions(id:ID!, permissions: [String!]) : Faculty! @permission(requires:MANAGE_APPLICATION) @user_type(requires:FACULTY)
+    updateStudent(id:ID! name: String username: String usn: String email: String dob:Date): Student! @permission(requires:MANAGE_STUDENTS) @user_type(requires:FACULTY)
+    createGroup(name: String! ): Group! @user_type(requires:FACULTY)
+    updateGroup(id:ID! name: String ): Group! @user_type(requires:FACULTY)
+    addFacultyToGroup(groupID:ID! facultyID: ID!): Group! @user_type(requires:FACULTY)
+    removeFacultyFromGroup(groupID:ID! facultyID: ID!): Group! @user_type(requires:FACULTY)
+    addStudentToGroup(groupID:ID! studentID: ID!): Group! @user_type(requires:FACULTY)
+    removeStudentFromGroup(groupID:ID! studentID: ID!): Group! @user_type(requires:FACULTY)
+    createTest(name: String! course_id:ID! ): Test! @user_type(requires:FACULTY)
+    updateTest(id:ID! name: String!): Test! @user_type(requires:FACULTY)
+    addFacultyToTest(testID:ID! facultyID: ID!): Test! @user_type(requires:FACULTY)
+    removeFacultyFromTest(testID:ID! facultyID: ID!): Test! @user_type(requires:FACULTY)
+    addTestToGroup(groupID:ID! testID:ID! ): Group! @user_type(requires:FACULTY)
+    removeTestFromGroup(testID:ID! groupID:ID!): Test! @user_type(requires:FACULTY)
+    attemptTest(id:ID!): Attempt! @user_type(requires:STUDENT)
+    answerQuestion(attemptID:ID! questionID:ID! data:String!): Answer! @user_type(requires:STUDENT)
+    finishAttempt(id:ID!): Attempt!@user_type(requires:STUDENT)
+    evaluateAnswer(id:ID! marks:Float!): Answer! @user_type(requires:FACULTY)
+    saveQuestion(id:ID! schema: JSON!):Question! @user_type(requires:FACULTY)
+    addQuestion(test_id:ID! qno: Int!): Test! @user_type(requires:FACULTY)
+    saveTestSettings(id:ID! settings: JSON!): Test! @user_type(requires:FACULTY)
+}
